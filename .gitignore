@@ -1,0 +1,17 @@
+## Python cache
+minimind_src/__pycache__/
+minimind_src/*.pyc
+minimind_src/*.pyo
+minimind_src/.DS_Store
+
+## Training / inference outputs
+minimind_src/out/
+minimind_src/checkpoints/
+minimind_src/*.tmp
+
+## Web / docs artifacts
+minimind_src/website/
+minimind_src/docs-minimind/
+
+## Large model artifacts (generated / packaged)
+minimind_src/minimind-3/
