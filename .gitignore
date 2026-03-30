@@ -3,6 +3,7 @@ minimind_src/__pycache__/
 minimind_src/*.pyc
 minimind_src/*.pyo
 minimind_src/.DS_Store
+.DS_Store
 
 ## Training / inference outputs
 minimind_src/out/
