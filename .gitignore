@@ -16,3 +16,6 @@ minimind_src/docs-minimind/
 
 ## Large model artifacts (generated / packaged)
 minimind_src/minimind-3/
+
+## Large Datasets
+minimind_src/dataset

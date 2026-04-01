@@ -1,30 +1,47 @@
-# 注：不建议再重复训练tokenizer（“词典”），MiniMind已自带，此脚本仅供学习和参考。基于不同词典训练的模型将导致输出完全不统一，降低社区的模型复用性
-# Note: It is not recommended to re-train the tokenizer. MiniMind already includes one. This script is for learning and reference only. Training models with different tokenizers will lead to inconsistent outputs and reduce model reusability in the community.
+# 注：不建议再重复训练tokenizer（“词典”），MiniMind已自带，此脚本仅供学习和参考。
+# 基于不同词典训练的模型将导致输出完全不统一，降低社区的模型复用性
 import os
 import json
 from tokenizers import decoders, models, pre_tokenizers, trainers, Tokenizer
 
+# 训练语料路径，通常使用 SFT 或预训练语料的子集
 DATA_PATH = '../dataset/sft_t2t_mini.jsonl'
+# 训练好的分词器输出目录
 TOKENIZER_DIR = '../model_learn_tokenizer/'
+# 目标词表大小：MiniMind 设为 6400，非常精简以适配轻量化模型
 VOCAB_SIZE = 6400
+# 预留特殊 Token 的总坑位数
 SPECIAL_TOKENS_NUM = 36
 
 def get_texts(data_path):
+    """
+    数据提取生成器：从 JSONL 中迭代读取对话内容，用于训练词表。
+    Input: data_path (str) - 原始数据路径
+    Yield: content (str) - 拼接后的文本字符串
+    """
     with open(data_path, 'r', encoding='utf-8', errors='ignore') as f:
         for i, line in enumerate(f):
-            if i >= 10000: break # 选10000行测试
+            if i >= 10000: break # 仅选取前 10000 行用于词表训练测试
             try:
                 data = json.loads(line)
+                # 提取 conversations 列表中所有角色发送的内容
                 contents = [item.get('content') for item in data.get('conversations', []) if item.get('content')]
                 if contents:
+                    # 将一轮对话拼接为长文本
                     yield "\n".join(contents)
             except json.JSONDecodeError:
                 continue
 
 def train_tokenizer(data_path, tokenizer_dir, vocab_size, special_tokens_num=SPECIAL_TOKENS_NUM):
+    """
+    分词器训练核心函数：使用 BPE 算法。
+    """
+    # 1. 初始化 BPE 模型实例
     tokenizer = Tokenizer(models.BPE())
+    # 2. 设置预分词器：ByteLevel 确保处理所有 UTF-8 字节，避免 OOV (Out-of-Vocabulary)
     tokenizer.pre_tokenizer = pre_tokenizers.ByteLevel(add_prefix_space=False)
     
+    # 3. 定义控制类特殊 Token (用于对话结构、多模态占位、TTS 等)
     special_tokens_list = [
         "<|endoftext|>", "<|im_start|>", "<|im_end|>", 
         "<|object_ref_start|>", "<|object_ref_end|>", "<|box_start|>", "<|box_end|>", "<|quad_start|>", "<|quad_end|>", 
@@ -32,28 +49,42 @@ def train_tokenizer(data_path, tokenizer_dir, vocab_size, special_tokens_num=SPE
         "<|audio_start|>", "<|audio_end|>", "<|audio_pad|>", "<tts_pad>", "<tts_text_bos>", "<tts_text_eod>", "<tts_text_bos_single>"
     ]
     
+    # 4. 定义能力类特殊 Token (工具调用与思考链)
     additional_tokens_list = [
         "<tool_call>", "</tool_call>",
         "<tool_response>", "</tool_response>",
         "<think>", "</think>"
     ]
+    
+    # 5. 计算并生成 Buffer Token：预留位置方便未来动态扩展词表，而无需重训整个模型
     num_buffer = special_tokens_num - len(special_tokens_list + additional_tokens_list)
-    buffer_tokens = [f"<|buffer{i}|>" for i in range(1, num_buffer + 1)] # 预留一定数量的token位置
+    buffer_tokens = [f"<|buffer{i}|>" for i in range(1, num_buffer + 1)] 
     all_special_tokens = special_tokens_list + additional_tokens_list + buffer_tokens
+    
+    # 6. 配置 BpeTrainer 训练参数
     trainer = trainers.BpeTrainer(
         vocab_size=vocab_size,
         show_progress=True,
-        initial_alphabet=pre_tokenizers.ByteLevel.alphabet(),
-        special_tokens=all_special_tokens
+        initial_alphabet=pre_tokenizers.ByteLevel.alphabet(), # 基础字节字母表
+        special_tokens=all_special_tokens # 将特殊 Token 放入词表最前方
     )
+    
+    # 7. 开始训练
     texts = get_texts(data_path)
     tokenizer.train_from_iterator(texts, trainer=trainer)
+    
+    # 8. 设置解码器为 ByteLevel
     tokenizer.decoder = decoders.ByteLevel()
+    # 再次显式添加特殊标记以确保 ID 映射正确
     tokenizer.add_special_tokens(special_tokens_list)
 
+    # 9. 保存原始 tokenizer 结构
     os.makedirs(tokenizer_dir, exist_ok=True)
     tokenizer.save(os.path.join(tokenizer_dir, "tokenizer.json"))
     tokenizer.model.save(tokenizer_dir)
+    
+    # 10. 后处理：修正 tokenizer.json 中的 special 标志
+    # 默认情况下，训练器可能不会将所有预设 token 标记为 special=True
     tokenizer_json_path = os.path.join(tokenizer_dir, "tokenizer.json")
     with open(tokenizer_json_path, 'r', encoding='utf-8') as f:
         tokenizer_data = json.load(f)
@@ -63,6 +94,7 @@ def train_tokenizer(data_path, tokenizer_dir, vocab_size, special_tokens_num=SPE
     with open(tokenizer_json_path, 'w', encoding='utf-8') as f:
         json.dump(tokenizer_data, f, ensure_ascii=False, indent=2)
     
+    # 11. 构造用于 tokenizer_config.json 的 added_tokens_decoder
     added_tokens_decoder = {}
     for i, token in enumerate(all_special_tokens):
         idx = tokenizer.token_to_id(token)
@@ -75,6 +107,8 @@ def train_tokenizer(data_path, tokenizer_dir, vocab_size, special_tokens_num=SPE
             "special": True if token in special_tokens_list else False
         }
 
+    # 12. 构造完整的 tokenizer_config.json，特别是 chat_template (Jinja2 模板)
+    # 该模板定义了多轮对话、工具调用、思考链在 Tokenize 时的拼接格式
     config = {
         "add_bos_token": False,
         "add_eos_token": False,
@@ -85,7 +119,7 @@ def train_tokenizer(data_path, tokenizer_dir, vocab_size, special_tokens_num=SPE
         "clean_up_tokenization_spaces": False,
         "eos_token": "<|im_end|>",
         "legacy": True,
-        "model_max_length": 131072,
+        "model_max_length": 131072, # 支持的长文本外推上限
         "pad_token": "<|endoftext|>",
         "sp_model_kwargs": {},
         "spaces_between_special_tokens": False,
@@ -101,13 +135,19 @@ def train_tokenizer(data_path, tokenizer_dir, vocab_size, special_tokens_num=SPE
         "tokenizer_class": "PreTrainedTokenizerFast"
     }
 
+    # 13. 保存配置文件
     with open(os.path.join(tokenizer_dir, "tokenizer_config.json"), "w", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=4)
     print("Tokenizer training completed.")
 
 def eval_tokenizer(tokenizer_dir):
+    """
+    分词器评估函数：测试编码解码一致性、词表长度、以及对中英文的压缩率。
+    """
     from transformers import AutoTokenizer
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir)
+    
+    # 1. 对话模板拼接测试
     messages = [
         {"role": "system", "content": "你是一个优秀的聊天机器人，总是给我正确的回应！"},
         {"role": "user", "content": '你来自哪里？'},
@@ -115,29 +155,25 @@ def eval_tokenizer(tokenizer_dir):
         {"role": "user", "content": '你到底来自哪里？'},
         {"role": "assistant", "content": '我来自地球'}
     ]
-    new_prompt = tokenizer.apply_chat_template(
-        messages,
-        tokenize=False
-    )
+    new_prompt = tokenizer.apply_chat_template(messages, tokenize=False)
     print('-'*100)
     print(new_prompt)
     print('-'*100)
+    
+    # 2. 基础属性与一致性测试
     print('tokenizer词表长度：', len(tokenizer))
     model_inputs = tokenizer(new_prompt)
     print('encoder长度：', len(model_inputs['input_ids']))
     response = tokenizer.decode(model_inputs['input_ids'], skip_special_tokens=False)
     print('decoder一致性：', response == new_prompt, "\n")
+    
+    # 3. 压缩率测试：一个好的分词器应该用更少的 Token 表示更多的字符
     print('-'*100)
     print('压缩率测试（Chars/Tokens）：')
     test_texts = [
-        # 中文样本 (约200字)
-        "人工智能是计算机科学的一个分支，它企图了解智能的实质，并生产出一种新的能以人类智能相似的方式做出反应的智能机器，该领域的研究包括机器人、语言识别、图像识别、自然语言处理和专家系统等。人工智能从诞生以来，理论和技术日益成熟，应用领域也不断扩大，可以设想，未来人工智能带来的科技产品，将会是人类智慧的“容器”。人工智能可以对人的意识、思维的信息过程的模拟。人工智能不是人的智能，但能像人那样思考、也可能超过人的智能。",
-        "星际航行是指在星系内甚至星系间的空间中进行的航行。由于宇宙空间极其广阔，传统的化学火箭动力在恒星间航行时显得力不从心。科学家们提出了多种方案，包括离子推进器、核热火箭、甚至是利用反物质作为能源的设想。此外，曲率驱动和虫洞旅行等科幻概念也在理论物理研究中被反复探讨。尽管目前人类的足迹仅限于月球，但随着核聚变技术和材料科学的突破，前往火星乃至更遥远的太阳系边缘将成为可能。",
-        # 英文样本 (约200词/字符)
-        "Large language models (LLMs) are a type of artificial intelligence (AI) trained on vast amounts of text data to understand and generate human-like language. These models use deep learning techniques, specifically transformers, to process and predict the next word in a sequence. LLMs like GPT-4, Llama, and Claude have demonstrated remarkable capabilities in coding, translation, and creative writing. However, they also face challenges such as hallucinations, where the model generates factually incorrect information, and the need for significant computational resources.",
-        "The development of sustainable energy is crucial for the future of our planet. As climate change continues to impact global weather patterns, transitioning from fossil fuels to renewable sources like solar, wind, and hydroelectric power has become an urgent priority. Innovations in battery storage technology and smart grid management are essential to ensure a reliable energy supply. International cooperation and policy frameworks are also necessary to drive the global shift towards a greener economy and reduce carbon emissions.",
-        # 混合样本
-        "Python 是一种高级编程语言，以其简洁的语法和强大的生态系统而闻名。It is widely used in data science, machine learning, and web development. 开发者可以利用 NumPy, Pandas, and PyTorch 等库快速构建复杂的应用。学习 Python 的过程非常愉快，因为它的代码读起来就像英语一样。Whether you are a beginner or an expert, Python offers something for everyone.",
+        "人工智能是计算机科学的一个分支...", # 中文长文本
+        "Large language models (LLMs) are...", # 英文长文本
+        "Python 是一种高级编程语言...", # 中英混合
     ]
     
     total_compression = 0
@@ -150,6 +186,8 @@ def eval_tokenizer(tokenizer_dir):
         print(f"样本 {i+1} | 字符数: {char_count:4} | Tokens: {token_count:3} | 压缩率: {compression_ratio:.2f}")
     
     print(f"平均压缩率: {total_compression / len(test_texts):.2f}")
+    
+    # 4. 流式解码测试：模拟推理时一个一个 token 输出的场景，检查字节缓冲处理
     print('-'*100)
     print('流式解码（字节缓冲）测试：')
     input_ids = model_inputs['input_ids']
@@ -157,6 +195,7 @@ def eval_tokenizer(tokenizer_dir):
     for tid in input_ids:
         token_cache.append(tid)
         current_decode = tokenizer.decode(token_cache)
+        # 仅当缓冲区内容可以组成完整字符时才打印 (避免 UTF-8 截断产生的乱码 \ufffd)
         if current_decode and '\ufffd' not in current_decode:
             display_ids = token_cache[0] if len(token_cache) == 1 else token_cache
             raw_tokens = [tokenizer.convert_ids_to_tokens(int(t)) for t in (token_cache if isinstance(token_cache, list) else [token_cache])]
@@ -164,5 +203,6 @@ def eval_tokenizer(tokenizer_dir):
             token_cache = []
 
 if __name__ == '__main__':
+    # 运行流程：训练 -> 评估
     train_tokenizer(DATA_PATH, TOKENIZER_DIR, VOCAB_SIZE)
     eval_tokenizer(TOKENIZER_DIR)
