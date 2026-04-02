@@ -1,28 +1,29 @@
-# 02_LoRA 适配与合并（逐行）
+# 02_LoRA 适配与合并（逐行解析）
 
-本章逐行解析 `minimind_src/model/model_lora.py` 中的 LoRA 实现方式，并重点说明：
-
-- 注入时 `Linear` 的 forward 是如何被“残差式叠加”到原输出里的
-- LoRA 权重的 state_dict 键如何命名（影响加载/保存/合并）
-- 维度关系：`x: [..., in_features] -> y: [..., out_features]`，以及 `(B @ A)` 的矩阵形状如何与原 `Linear.weight` 对齐
+本章深入解析 `minimind_src/model/model_lora.py`。LoRA (Low-Rank Adaptation) 是大模型微调的“工业标准”，理解其纯 PyTorch 手写实现对掌握 PEFT (参数高效微调) 至关重要。
 
 ---
 
-## 1. Import（逐行）
+## 1. LoRA 的核心思想：低秩假设 (L14)
 
-```python
-1: import torch
-2: from torch import optim, nn
-```
+### 1.1 为什么 ΔW 是低秩的？
+LoRA 的核心假设是：模型在适配下游任务时，权重的变化量 $\Delta W$ 具有很低的“内在秩”（Intrinsic Rank）。
+- **全参数微调**：更新 $W$，参数量 $d \times d$。
+- **LoRA**：令 $\Delta W = B \times A$，其中 $A \in \mathbb{R}^{r \times d}$，$B \in \mathbb{R}^{d \times r}$，秩 $r \ll d$。
 
-- 第 1 行：用于加载/保存权重（`torch.load/torch.save`）以及 tensor 运算。
-- 第 2 行：`nn` 用于定义模块；`optim` 在本文件里未被实际使用（训练脚本用）。
+### 1.2 优势对比
+| 维度 | 全参微调 | LoRA (r=16) |
+| :--- | :--- | :--- |
+| **可训练参数** | 100% | ~2% |
+| **显存占用** | 极高 (需存所有梯度) | 极低 (仅存 A/B 梯度) |
+| **存储成本** | 每个任务 128MB+ | 每个任务 ~2MB |
+| **推理延迟** | 无 | 合并后为零 |
 
 ---
 
 ## 2. LoRA 子模块：`class LoRA(nn.Module)`
 
-### 2.1 init：构建低秩分解（逐行+维度）
+### 2.1 初始化策略：稳健的起点
 
 ```python
 6: class LoRA(nn.Module):

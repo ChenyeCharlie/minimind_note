@@ -1,6 +1,6 @@
 # 01_核心模型 MiniMind（逐行+张量维度）
 
-本章聚焦 `minimind_src/model/model_minimind.py` 的核心实现。要求你后续每一处张量维度变化都能从这里“对上号”，所以本章会对关键维度做显式推导（尤其是 Attention、RoPE、MoE、KV cache 与 CausalLM loss shift）。
+本章聚焦 `minimind_src/model/model_minimind.py` 的核心实现。我们将深入探讨 MiniMind 如何通过 LLaMA 式的架构设计，在极小的参数量下实现完整的语言建模能力。
 
 ---
 
@@ -20,7 +20,7 @@
 
 ---
 
-## 1. Import 与依赖（逐行）
+## 1. Import 与依赖：生态对接
 
 ```python
 1: import math, torch, torch.nn.functional as F
@@ -38,7 +38,7 @@
 
 ---
 
-## 2. `MiniMindConfig`（配置逐行）
+## 2. `MiniMindConfig`：模型的基因图谱
 
 ```python
 10: class MiniMindConfig(PretrainedConfig):
@@ -71,7 +71,7 @@
 
 ---
 
-## 3. `RMSNorm`（逐行+维度）
+## 3. `RMSNorm`：稳健的归一化 (L07)
 
 ```python
 49: class RMSNorm(torch.nn.Module):

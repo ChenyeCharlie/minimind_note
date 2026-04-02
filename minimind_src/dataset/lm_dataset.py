@@ -12,7 +12,7 @@ def pre_processing_chat(conversations, add_system_ratio=0.2):
     """
     对话数据的预处理逻辑：
     1. 如果对话中包含 tools（工具调用），则不做处理，保持数据原样。
-    2. 否则，有一定概率（add_system_ratio）随机添加预设的系统提示词（System Prompt）。
+    2. 否则，有一定概率（add_system_ratio）随机添加预设的 System Prompt。
     """
     # tool use 数据完整保留不做处理
     if any(conv.get('tools') for conv in conversations): 
