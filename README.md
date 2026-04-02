@@ -28,10 +28,6 @@
   - `web_demo.py`：Streamlit 网页端（流式渲染 + 工具回填重生成）
   - `eval_toolcall.py`：ToolCall 评测（解析工具标签 -> 执行 -> 回填 -> 继续生成）
   - `convert_model.py`：torch<->transformers 格式转换、chat_template jinja/json 互转
-- `minimind_src/minimind-3/`（模型工件）
-  - `chat_template.jinja`：对话模板协议（`<|im_start|>/<|im_end|>、<think>、<tool_call>、<tool_response>`）
-  - `tokenizer_config.json`：特殊 token/词表与 chat_template 字段
-  - `config.json`：结构参数与 RoPE 配置（如 `rope_theta`、heads、vocab_size）
 
 ---
 
@@ -51,5 +47,4 @@
 12. [11_GRPO 强化学习](learning_notes/11_GRPO%20强化学习（group%20相对策略）.md)
 13. [12_AgentRL](learning_notes/12_AgentRL（ToolCall%20多轮与奖励规则）.md)
 14. [13_推理与服务脚本](learning_notes/13_推理与服务脚本（加载-生成-流式-工具解析-模型转换）.md)
-15. [14_minimind-3](learning_notes/14_minimind-3.md)
 

@@ -1,10 +1,10 @@
-# 02_LoRA 适配与合并（逐行解析）
+# 02_LoRA 适配与合并
 
 本章深入解析 `minimind_src/model/model_lora.py`。LoRA (Low-Rank Adaptation) 是大模型微调的“工业标准”，理解其纯 PyTorch 手写实现对掌握 PEFT (参数高效微调) 至关重要。
 
 ---
 
-## 1. LoRA 的核心思想：低秩假设 (L14)
+## 1. LoRA 的核心思想：低秩假设
 
 ### 1.1 为什么 ΔW 是低秩的？
 LoRA 的核心假设是：模型在适配下游任务时，权重的变化量 $\Delta W$ 具有很低的“内在秩”（Intrinsic Rank）。
@@ -54,7 +54,7 @@ LoRA 的核心假设是：模型在适配下游任务时，权重的变化量 $\
 - `A` 正态初始化：提供随机特征投影空间
 - `B` 全 0 初始化：初始时 `DeltaW=0`，因此模型初始行为与未训练 LoRA 基线一致（更稳定的微调起点）。
 
-### 2.2 forward：`B(A(x))`（逐行+维度）
+### 2.2 forward：`B(A(x))`
 
 ```python
 17:     def forward(self, x):
@@ -71,7 +71,7 @@ LoRA 的核心假设是：模型在适配下游任务时，权重的变化量 $\
 
 ---
 
-## 3. 注入 LoRA：`apply_lora(model, rank=16)`（逐行+关键机制）
+## 3. 注入 LoRA：`apply_lora(model, rank=16)`
 
 ### 3.1 遍历所有子模块并筛选 `nn.Linear`
 
@@ -97,7 +97,7 @@ LoRA 的核心假设是：模型在适配下游任务时，权重的变化量 $\
   - 这样 `model.parameters()` 会包含 LoRA 参数（训练脚本会按名字筛选 `lora` 参数并设置 `requires_grad=True`）。
 - 第 26 行：保存原始 forward 以便后续“叠加式”调用。
 
-### 3.2 显式绑定 forward：残差叠加（逐行+维度）
+### 3.2 显式绑定 forward：残差叠加
 
 ```python
 28:             def forward_with_lora(x, layer1=original_forward, layer2=lora):
@@ -120,7 +120,7 @@ LoRA 的核心假设是：模型在适配下游任务时，权重的变化量 $\
 
 ---
 
-## 4. 加载 LoRA：`load_lora(model, path)`（逐行+state_dict 键规则）
+## 4. 加载 LoRA：`load_lora(model, path)`
 
 ```python
 35: def load_lora(model, path):
@@ -146,7 +146,7 @@ LoRA 的核心假设是：模型在适配下游任务时，权重的变化量 $\
 
 ---
 
-## 5. 保存 LoRA：`save_lora(model, path)`（逐行+键规则）
+## 5. 保存 LoRA：`save_lora(model, path)`
 
 ```python
 45: def save_lora(model, path):
@@ -171,7 +171,7 @@ LoRA 的核心假设是：模型在适配下游任务时，权重的变化量 $\
 
 ---
 
-## 6. 合并 LoRA：`merge_lora(model, lora_path, save_path)`（逐行+矩阵乘法维度）
+## 6. 合并 LoRA：`merge_lora(model, lora_path, save_path)`
 
 ```python
 56: def merge_lora(model, lora_path, save_path):
@@ -218,9 +218,9 @@ LoRA 的核心假设是：模型在适配下游任务时，权重的变化量 $\
 
 ---
 
-## 7. 与训练脚本的衔接（你后续必会用到）
+## 7. 与训练脚本的衔接
 
-虽然本章只讲 `model_lora.py`，但你后续读 `train_lora.py` 时需要把以下事实牢牢记住：
+虽然本章只讲 `model_lora.py`，但后续 `train_lora.py` 时：
 
 - `apply_lora(model)` 会把 LoRA 模块挂在每个目标 `nn.Linear` 上，并替换它的 `forward`
 - `save_lora(model)` 只保存 LoRA 子模块权重（`{layer}.lora.A/B.weight`）

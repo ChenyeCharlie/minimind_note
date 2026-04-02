@@ -37,7 +37,7 @@
 
 ## 2. Critic 网络：`class CriticModel(MiniMindForCausalLM)`
 
-### 2.1 构造：替换 head 为 value_head（逐行）
+### 2.1 构造：替换 head 为 value_head
 
 ```python
 36: class CriticModel(MiniMindForCausalLM):
@@ -51,7 +51,7 @@
 - critic 输出的是每个位置一个 value 标量
 - `value_head` 把 hidden `[... , hidden_size] -> [..., 1]`
 
-### 2.2 forward：返回每个 token 的值（逐行+维度）
+### 2.2 forward：返回每个 token 的值
 
 ```python
 42:     def forward(self, input_ids=None, attention_mask=None, **kwargs):
@@ -350,7 +350,7 @@
 
 ---
 
-## 4.7 PPO 更新：clipped policy + value clipping（逐行+维度）
+## 4.7 PPO 更新：clipped policy + value clipping
 
 ### 4.7.1 minibatch 划分
 
@@ -529,7 +529,7 @@
 
 ---
 
-## 5. __main__：PPO 启动与模块装配（逐行+维度语义）
+## 5. __main__：PPO 启动与模块装配
 
 ### 5.1 构建 actor/ref/critic 与 reward model
 
@@ -578,7 +578,7 @@
 
 ---
 
-## 6. 本章小结（你需要复核的对齐点）
+## 6. 本章小结
 
 1. response 区间切片定义：
    - `resp_start = prompt_length - 1`

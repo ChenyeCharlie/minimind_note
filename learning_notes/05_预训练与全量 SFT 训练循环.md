@@ -13,7 +13,7 @@
 
 ---
 
-## 1. 共同张量约定（用于本章后续所有维度解释）
+## 1. 共同张量约定
 
 在训练脚本中，DataLoader 的 batch 一般来自 Dataset 的 `__getitem__` 返回值：
 
@@ -37,7 +37,7 @@
 
 ## 2. 预训练入口：`train_pretrain.py`
 
-### 2.1 import 与依赖（逐行）
+### 2.1 import 与依赖
 
 ```python
 1: import os
@@ -358,7 +358,7 @@ if step % args.accumulation_steps == 0: unscale + clip + scaler.step + scaler.up
 
 ---
 
-## 4. 本章小结（你需要“能复核”的点）
+## 4. 本章小结
 
 1. 预训练与全量 SFT 的训练循环骨架完全一致，差异主要来自 Dataset 的 `labels` 构造。
 2. 梯度累积：
@@ -371,5 +371,5 @@ if step % args.accumulation_steps == 0: unscale + clip + scaler.step + scaler.up
    - 由 `init_distributed_mode` + `RANK/LOCAL_RANK` 控制
    - 并忽略 `freqs_cos/freqs_sin` 这类 buffer 以避免 DDP 同步问题。
 
-下一章我会生成 `06_LoRA 微调训练.md`，逐行解析 `train_lora.py`：如何 `apply_lora` 后冻结非 LoRA 参数、只训练 LoRA 子模块，并用 `save_lora` 保存“只包含 lora 的 state_dict”。
+下一章 `06_LoRA 微调训练.md`，逐行解析 `train_lora.py`：如何 `apply_lora` 后冻结非 LoRA 参数、只训练 LoRA 子模块，并用 `save_lora` 保存“只包含 lora 的 state_dict”。
 

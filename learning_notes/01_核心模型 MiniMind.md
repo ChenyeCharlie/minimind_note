@@ -1,10 +1,10 @@
 # 01_核心模型 MiniMind（逐行+张量维度）
 
-本章聚焦 `minimind_src/model/model_minimind.py` 的核心实现。我们将深入探讨 MiniMind 如何通过 LLaMA 式的架构设计，在极小的参数量下实现完整的语言建模能力。
+本章聚焦 `minimind_src/model/model_minimind.py` 的核心实现。深入探讨 MiniMind 如何通过 LLaMA 式的架构设计，在极小的参数量下实现完整的语言建模能力。
 
 ---
 
-## 0. 文件入口：`model_minimind.py` 的角色
+## 0. 文件入口：`model_minimind.py` 
 
 该文件定义了：
 
@@ -38,7 +38,7 @@
 
 ---
 
-## 2. `MiniMindConfig`：模型的基因图谱
+## 2. `MiniMindConfig`
 
 ```python
 10: class MiniMindConfig(PretrainedConfig):
@@ -71,7 +71,7 @@
 
 ---
 
-## 3. `RMSNorm`：稳健的归一化 (L07)
+## 3. `RMSNorm`：稳健的归一化
 
 ```python
 49: class RMSNorm(torch.nn.Module):
@@ -89,7 +89,7 @@
 
 ---
 
-## 4. RoPE 频率预计算：`precompute_freqs_cis`（维度推导）
+## 4. RoPE 频率预计算：`precompute_freqs_cis`
 
 维度推导（假设 `dim=head_dim=d`）：
 
@@ -101,9 +101,7 @@
 
 ---
 
-## 5. Attention：核心张量维度追踪
-
-这是整个模型最复杂的维度变换区。
+## 5. Attention
 
 ### 5.1 QKV 投影与切分
 
@@ -140,7 +138,7 @@
 
 ---
 
-## 6. MoE 路由逻辑：`MOEFeedForward`（关键行解析）
+## 6. MoE 路由逻辑：`MOEFeedForward`
 
 ```python
 157: scores = F.softmax(self.gate(x_flat), dim=-1) # [BT, E]
@@ -189,7 +187,6 @@
 
 ## 9. 本章总结
 
-通过本章，你应该能脑补出数据流动的完整“形状图”：
 1. `[B, T]` 的 ID 序列进入 Embedding。
 2. 变为 `[B, T, C]` 的连续向量。
 3. 经由 `MiniMindBlock` 的多层处理，始终保持 `[B, T, C]`。

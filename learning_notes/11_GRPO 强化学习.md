@@ -40,7 +40,7 @@
 
 ---
 
-## 3. 从 Dataset 到 rollout 输入：prompt tokenization（逐行+维度）
+## 3. 从 Dataset 到 rollout 输入：prompt tokenization
 
 训练 batch：
 
@@ -68,7 +68,7 @@
 
 ---
 
-## 4. rollout：生成多个 completion（逐行+维度）
+## 4. rollout：生成多个 completion
 
 ```python
 79: rollout_result = rollout_engine.rollout(
@@ -150,7 +150,7 @@
 
 ---
 
-## 7. rewards 与 group 化：advantages（逐行+维度）
+## 7. rewards 与 group 化：advantages
 
 ```python
 104: rewards = calculate_rewards(prompts, completions, reward_model).to(args.device)  # [B*num_gen]
@@ -176,7 +176,7 @@
 
 ---
 
-## 8. completion_mask：EOS 截断（逐行+维度）
+## 8. completion_mask：EOS 截断
 
 这一步用于 token 级 loss 里只统计有效 completion token。
 
@@ -202,7 +202,7 @@
 
 ---
 
-## 9. KL-like 正则与 ratio：token 级核心量（逐行+维度）
+## 9. KL-like 正则与 ratio：token 级核心量
 
 ```python
 131: kl_div = ref_per_token_logps - per_token_logps
@@ -264,7 +264,7 @@
 
 ---
 
-## 11. policy_loss 的 mask 聚合（逐行+维度）
+## 11. policy_loss 的 mask 聚合
 
 ```python
 142: policy_loss = ((per_token_loss * completion_mask).sum(dim=1) / completion_mask.sum(dim=1)).mean()
@@ -286,7 +286,7 @@
 
 ---
 
-## 12. 梯度累积与 optimizer/scheduler step（逐行）
+## 12. 梯度累积与 optimizer/scheduler step
 
 ```python
 146: if step % args.accumulation_steps == 0:
@@ -307,7 +307,7 @@
 
 ---
 
-## 13. 本章小结（你应当掌握的“复核点”）
+## 13. 本章小结
 
 1. rollout 维度核心：
    - `outputs: [B*num_gen, P+R]`

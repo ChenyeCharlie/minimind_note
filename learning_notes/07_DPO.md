@@ -2,14 +2,14 @@
 
 本章对应 `minimind_src/trainer/train_dpo.py`，实现的是 Direct Preference Optimization（DPO）。
 
-你需要掌握两点：
+需要掌握两点：
 
 1. `DPODataset` 输出的 chosen/rejected 序列如何在训练里拼成一个 batch，并在 DPO loss 内再切回 chosen/rejected。
 2. `mask` 如何把“只监督 assistant 段”的 token 贡献聚合成每条序列的标量 logprob 总和，从而进入 DPO 的 log-ratio 计算。
 
 ---
 
-## 1. 背景：为什么需要对齐 (L17)
+## 1. 背景：为什么需要对齐
 
 SFT 模型虽然学会了对话，但它是通过**模仿学习**实现的。它并不真正理解什么是“好”的回答。
 对齐（Alignment）的目标是让模型符合人类价值观（HHH原则）：
@@ -40,7 +40,7 @@ $$ r(x,y) = \beta \log \frac{\pi^*(y|x)}{\pi_{ref}(y|x)} + \beta \log Z(x) $$
 
 ---
 
-## 1. Import（逐行解释）
+## 1. Import
 
 ```python
 1: import os
@@ -69,7 +69,7 @@ $$ r(x,y) = \beta \log \frac{\pi^*(y|x)}{\pi_{ref}(y|x)} + \beta \log Z(x) $$
 
 ---
 
-## 2. `logits_to_log_probs`（逐行+张量维度）
+## 2. `logits_to_log_probs`
 
 ```python
 24: def logits_to_log_probs(logits, labels):
@@ -99,7 +99,7 @@ $$ r(x,y) = \beta \log \frac{\pi^*(y|x)}{\pi_{ref}(y|x)} + \beta \log Z(x) $$
 
 ---
 
-## 3. `dpo_loss`（逐行+chosen/rejected 切分机制）
+## 3. `dpo_loss`
 
 ```python
 33: def dpo_loss(ref_log_probs, policy_log_probs, mask, beta):
@@ -170,7 +170,7 @@ $$ r(x,y) = \beta \log \frac{\pi^*(y|x)}{\pi_{ref}(y|x)} + \beta \log Z(x) $$
 
 ---
 
-## 4. `train_epoch`（逐行+张量维度：from Dataset 到 loss）
+## 4. `train_epoch`
 
 函数签名：
 
@@ -269,7 +269,7 @@ $$ r(x,y) = \beta \log \frac{\pi^*(y|x)}{\pi_{ref}(y|x)} + \beta \log Z(x) $$
 
 ---
 
-## 5. 保存 checkpoint（权重快照 + resume 状态）
+## 5. 保存 checkpoint
 
 ```python
 107: if (step % args.save_interval == 0 or step == iters) and is_main_process():
@@ -350,20 +350,7 @@ $$ r(x,y) = \beta \log \frac{\pi^*(y|x)}{\pi_{ref}(y|x)} + \beta \log Z(x) $$
 
 ---
 
-## 8. 面试高频考点
-
-### Q1: 为什么 DPO 只需要策略模型和参考模型？
-答：DPO 通过数学推导，将奖励模型隐含地表达为策略概率与参考概率的比值。在 Bradley-Terry 模型下，奖励项相互抵消，从而将对齐问题转化为类似于交叉熵的监督学习。
-
-### Q2: β 参数的作用是什么？
-答：控制对参考模型的偏离程度。β 越大，KL 惩罚项越重，模型越倾向于保持原有能力；β 越小，模型越激进地迎合偏好数据。
-
-### Q3: DPO 的局限性有哪些？
-答：(1) Off-policy 导致它无法发现数据集中不存在的更优解；(2) 高度依赖 chosen/rejected 数据的区分度；(3) 容易出现分布偏移导致的过拟合。
-
----
-
-## 9. 本章小结（你应该能复核）
+## 8. 本章小结
 
 1. chosen/rejected 拼接规则：
    - `x = [chosen; rejected]` 在 batch 维拼接，然后在 `dpo_loss` 内按前半/后半切回。
@@ -373,4 +360,4 @@ $$ r(x,y) = \beta \log \frac{\pi^*(y|x)}{\pi_{ref}(y|x)} + \beta \log Z(x) $$
 3. logits_to_log_probs 对齐：
    - dataset 已构造 `x = input[:-1]`、`y = input[1:]`，所以在这里 logits 与 labels 不需要再 shift。
 
-下一章（`08_知识蒸馏`）我会解析 `train_distillation.py`：它的关键不同是蒸馏使用 token 级 KL（温度缩放），而不是 DPO 的 log-ratio 偏好差。
+下一章 `08_知识蒸馏` 会解析 `train_distillation.py`：它的关键不同是蒸馏使用 token 级 KL（温度缩放），而不是 DPO 的 log-ratio 偏好差。

@@ -2,7 +2,7 @@
 
 本章对应 `minimind_src/trainer/train_lora.py`。目标是在不更新原始大部分参数的前提下，仅训练 LoRA 注入到 `nn.Linear` 上的低秩增量，从而完成对话/指令 SFT 风格数据的微调。
 
-## 1. LoRA 的核心理论支撑 (L14)
+## 1. LoRA 的核心理论支撑
 
 在深入代码前，需掌握 LoRA (Low-Rank Adaptation) 的两个关键假设：
 - **低秩假设**：模型在适配下游任务时，权重的变化量 $\Delta W$ 实际上是低秩的（Intrinsic Rank 远小于 $d$）。
@@ -12,7 +12,7 @@
   - **收敛快速**：在更小的参数空间内搜索，通常比全参微调更早达到性能平原。
   - **无损推理**：权重合并后，推理延迟与原模型完全一致。
 
-本章你需要重点掌握的链路是：
+本章需要重点掌握的链路是：
 
 - `init_model(...)`：先加载“基底 dense 权重”（通常来自 `full_sft` 或 `pretrain`）
 - `apply_lora(model)`：给模型所有目标 `Linear` 注入 `module.lora` 并替换 forward 为“原输出 + LoRA 输出”
@@ -24,7 +24,7 @@
 
 ---
 
-## 1. Import（逐行）
+## 1. Import
 
 ```python
 1: import os
@@ -52,7 +52,7 @@
 
 ---
 
-## 2. `train_epoch`：LoRA-only 训练步（逐行+张量语义）
+## 2. `train_epoch`：LoRA-only 训练步
 
 ### 2.1 函数签名与参数含义
 
@@ -124,7 +124,7 @@
   - 这里 clip 只作用在 `lora_params`，与 optimizer 管理参数一致
   - 因而不会浪费时间在冻结参数上进行梯度计算（被冻结的参数理论上不会有梯度，或 grad 为 None）。
 
-### 2.6 日志与保存（逐行）
+### 2.6 日志与保存
 
 日志：
 
@@ -170,7 +170,7 @@
 
 ---
 
-## 3. `__main__`：LoRA 训练启动流程（逐行）
+## 3. `__main__`：LoRA 训练启动流程
 
 ### 3.1 argparse 参数含义
 
@@ -213,7 +213,7 @@
 if args.use_wandb and is_main_process(): ... wandb.init(...)
 ```
 
-### 3.5 init_model -> apply_lora -> 冻结非 LoRA 参数（核心逻辑逐行）
+### 3.5 init_model -> apply_lora -> 冻结非 LoRA 参数
 
 ```python
 127: model, tokenizer = init_model(lm_config, args.from_weight, device=args.device)
@@ -260,7 +260,7 @@ if args.use_wandb and is_main_process(): ... wandb.init(...)
 - SFTDataset 输出 `[T]`，batch 后 `[B,T]`。
 - scaler 仅在 `args.dtype=='float16'` 时启用；bf16 通常不需要动态 loss scaling。
 
-### 3.7 resume：加载 model/optimizer/scaler 状态（逐行）
+### 3.7 resume：加载 model/optimizer/scaler 状态
 
 ```python
 152: start_epoch, start_step = 0, 0
@@ -311,7 +311,7 @@ if args.use_wandb and is_main_process(): ... wandb.init(...)
 
 ---
 
-## 4. 本章小结（你应该能复核的检查点）
+## 4. 本章小结
 
 1. 注入与 forward：
    - `apply_lora(model)` 通过替换每个目标 `Linear.forward` 实现 `Linear(x) + LoRA(x)`。
@@ -328,18 +328,4 @@ if args.use_wandb and is_main_process(): ... wandb.init(...)
 
 ---
 
-## 5. 面试高频考点 (L14)
-
-### Q1: 为什么 LoRA 训练中主模型不更新，却仍然占用大量显存？
-答：虽然主模型权重被冻结（不需要存梯度和优化器状态），但**前向传播的激活值 (Activations)** 仍然需要保存在显存中，以便在反向传播时计算 LoRA 旁路矩阵 $A$ 和 $B$ 的梯度。
-
-### Q2: LoRA 的 $B$ 矩阵为什么必须初始化为全 0？
-答：确保训练开始时 $\Delta W = B \times A = 0$。这使得模型初始输出与原预训练模型完全一致，保证了微调的起点是稳健的，不会因为随机初始化的旁路而破坏预训练知识。
-
-### Q3: 既然 LoRA 效果好，为什么不直接训练一个 $r \times r$ 的小模型？
-答：LoRA 的有效性建立在预训练模型学到的**高维特征空间**之上。低秩增量是对这一成熟空间的微调，而非在低维空间重新学习知识。
-
-### Q4: 训练中如何选择秩 $r$？
-答：通常 $r=8$ 或 $16$ 已能满足大部分指令遵循任务。秩越大，模型表达能力越强，但显存占用增加且过拟合风险变大。MiniMind 默认使用 $r=16$。
-
-下一章（`07_DPO（偏好对齐）`）我会逐行解析 `train_dpo.py`：从 `DPODataset` 输出的 `x/y/mask` 到 `dpo_loss` 里 chosen/rejected 的切分逻辑与 mask 聚合方式，解释为什么 DPO 的损失能落在 logprob 差值上，而不是直接 CE。
+下一章 `07_DPO（偏好对齐）` 会逐行解析 `train_dpo.py`：从 `DPODataset` 输出的 `x/y/mask` 到 `dpo_loss` 里 chosen/rejected 的切分逻辑与 mask 聚合方式，解释为什么 DPO 的损失能落在 logprob 差值上，而不是直接 CE。
